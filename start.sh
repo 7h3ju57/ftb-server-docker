@@ -2,33 +2,28 @@
 
 set -e
 
-echo "$MODPACK" > /modpack
-touch /version && chown -R minecraft /version /modpack
-
-if [[ "$MODPACK" != $(cat /modpack) ]] && [[ -e /tmp/feed-the-beast ]]; then
-	rm -r /tmp/feed-the-beast/*
-fi
-
+touch /data/version
 if [[ "$UPDATE" == "yes" ]]; then
 	BASE="https://www.feed-the-beast.com"
 	a=$(wget -qO- "$BASE"/modpacks | grep -io ".*href=.*$MODPACK.*" | sed -e 's/<a .*href=['"'"'"]//' -e 's/["'"'"'].*$//' -e '/^$/ d' | xargs | head -n 1)
 	b="$(wget -qO- "$BASE""$a" | grep -o '<a .*href=.*>' | sed -e 's/<a /\n<a /g' | sed -e 's/<a .*href=['"'"'"]//' -e 's/["'"'"'].*$//' -e '/^$/ d' | grep file | grep -v latest | grep -v download | grep -v filter | sort -r | head -n 1)"
 	c="$(wget -qO- "$BASE""$b" | grep -o '<a .*href=.*>' | sed -e 's/<a /\n<a /g' | sed -e 's/<a .*href=['"'"'"]//' -e 's/["'"'"'].*$//' -e '/^$/ d' | grep download | sort -r | head -n 1)"
-	if [[ $(echo "$c" | cut -d"/" -f5) != $(cat /version) ]]; then
-		wget "$BASE""$c" -O /tmp/FTBModpack.zip && echo "$c" | cut -d"/" -f5 > /version
+	if [[ $(echo "$c" | cut -d"/" -f5) != $(cat /data/version) ]]; then
+		wget "$BASE""$c" -O /tmp/FTBModpack.zip && echo "$c" | cut -d"/" -f5 > /data/version
+		if [[ -e /data/config ]]; then
+			rm -r /data/{config,mods,resources,libraries,scripts,FTBserver*universal.jar,version.json}
+		fi
+		mkdir -p /tmp/ftb && cd /tmp/ftb \
+			&& unzip /tmp/FTBModpack.zip \
+			&& rm /tmp/FTBModpack.zip \
+			&& cd /data && cp -rf /tmp/ftb/* /data \
+			&& bash -x FTBInstall.sh
 	fi
-	if [[ -e /tmp/feed-the-beast/config ]]; then
-		rm -r /tmp/feed-the-beast/{config,mods,resources,libraries,scripts,FTBserver*universal.jar}
-	fi
-	mkdir -p /tmp/feed-the-beast \
-		&& cd /tmp/feed-the-beast \
-		&& unzip /tmp/FTBModpack.zip \
-		&& rm /tmp/FTBModpack.zip \
-		&& bash -x FTBInstall.sh \
-		&& chown -R minecraft /tmp/feed-the-beast
 fi
 cd /data
-cp -rf /tmp/feed-the-beast/* .
+#if [[ "$UPDATE" == "no" ]]; then
+#	cp -rf /tmp/feed-the-beast/* .
+#fi
 echo "eula=true" > eula.txt
 
 if [[ ! -e server.properties ]]; then
